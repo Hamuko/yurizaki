@@ -1,0 +1,11 @@
+[package]
+name = "yurizaki"
+version = "1.0.0"
+authors = []
+edition = "2021"
+
+[dependencies]
+anitomy = "0.1"
+notify = "4.0"
+trash = "1.0.0"
+yaml-rust = "0.4"
