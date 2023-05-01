@@ -1,6 +1,6 @@
+extern crate directories;
 extern crate trash;
 
-use std::env;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -259,13 +259,31 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
 
 fn main() {
     // TODO: Configurable config path.
-    let mut config_path = env::home_dir().unwrap();
-    config_path.push(".config/yurizaki.yml");
+    let Some(project_directory) = directories::ProjectDirs::from("", "", "yurizaki") else {
+        println!("Could not establish configuration directory.");
+        process::exit(1);
+    };
+    let mut config_path = PathBuf::new();
+    config_path.push(project_directory.config_dir());
+    config_path.push("config.yml");
 
     let mut configuration = match config::Configuration::new(&config_path) {
         Ok(config) => config,
         Err(config::Error::Io(error)) => {
-            println!("There was a problem with reading the configuration: {}", error);
+            match error.kind() {
+                io::ErrorKind::NotFound => {
+                    println!(
+                        "Could not find the configuration file in \"{}\".",
+                        config_path.display()
+                    );
+                }
+                _ => {
+                    println!(
+                        "There was a problem with reading the configuration: {}",
+                        error
+                    );
+                }
+            }
             return;
         }
         Err(config::Error::MissingSource) => {
