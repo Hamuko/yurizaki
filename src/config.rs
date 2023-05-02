@@ -1,5 +1,6 @@
 extern crate yaml_rust;
 
+use log::warn;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
@@ -107,9 +108,7 @@ impl Configuration {
         };
 
         if cfg!(not(feature = "trash")) && trash {
-            println!(
-                "yurizaki was built without trash support; enabling trash does nothing."
-            );
+            warn!("yurizaki was built without trash support; enabling trash does nothing.");
         }
 
         Ok(Configuration {

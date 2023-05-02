@@ -7,7 +7,9 @@ edition = "2021"
 [dependencies]
 anitomy = "0.1"
 directories = "5.0"
+log = "0.4"
 notify = "4.0"
+simple_logger = "4.1"
 trash = { version = "3.0", optional = true }
 yaml-rust = "0.4"
 

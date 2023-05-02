@@ -3,6 +3,7 @@ extern crate directories;
 #[cfg(feature = "trash")]
 extern crate trash;
 
+use log::{debug, error, info, warn, LevelFilter};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -12,6 +13,7 @@ use std::thread;
 use std::time::Duration;
 
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use simple_logger::SimpleLogger;
 
 mod anime;
 mod config;
@@ -132,19 +134,19 @@ fn remove_file(config: &config::Configuration, path: &PathBuf) {
     if config.trash {
         match trash::delete(path) {
             Ok(_) => {
-                println!("Removed file \"{}\"", path.display());
+                debug!("Removed file \"{}\"", path.display());
             }
             Err(e) => {
-                println!("Unable to trash \"{}\" ({:?})", path.display(), e);
+                warn!("Unable to trash \"{}\" ({:?})", path.display(), e);
             }
         }
     } else {
         match fs::remove_file(path) {
             Ok(_) => {
-                println!("Removed file \"{}\"", path.display());
+                debug!("Removed file \"{}\"", path.display());
             }
             Err(e) => {
-                println!("Unable to delete \"{}\" ({})", path.display(), e);
+                warn!("Unable to delete \"{}\" ({})", path.display(), e);
             }
         }
     }
@@ -154,10 +156,10 @@ fn remove_file(config: &config::Configuration, path: &PathBuf) {
 fn remove_file(_config: &config::Configuration, path: &PathBuf) {
     match fs::remove_file(path) {
         Ok(_) => {
-            println!("Removed file \"{}\"", path.display());
+            debug!("Removed file \"{}\"", path.display());
         }
         Err(e) => {
-            println!("Unable to delete \"{}\" ({})", path.display(), e);
+            warn!("Unable to delete \"{}\" ({})", path.display(), e);
         }
     }
 }
@@ -171,10 +173,10 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     let filename = &path.file_name()?.to_str()?;
     let release = anime::Release::from(filename)?;
     let rule = config.get_rule(&release.title)?;
-    println!("MATCH: \"{}\" => {}", &filename, rule.title);
+    info!("MATCH: \"{}\" => {}", &filename, rule.title);
 
     if !rule.groups.contains(&release.group) {
-        println!(
+        info!(
             "SKIP: Group \"{}\" not listed in {}",
             release.group, rule.title
         );
@@ -185,7 +187,7 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     match (rule.minimum, release.numerical_episode()) {
         (Some(minimum), Some(episode_number)) => {
             if minimum > episode_number as i64 {
-                println!(
+                info!(
                     "SKIP: Episode number {} does not meet minimum of {}",
                     episode_number, minimum
                 );
@@ -205,23 +207,23 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     copy_target.push(&rule.title);
     let target_directory = copy_target.clone();
     if !target_directory.exists() {
-        println!(
+        debug!(
             "Missing directory \"{}\", creating...",
             &target_directory.to_str().unwrap()
         );
         match fs::create_dir(&target_directory) {
             Ok(()) => {
-                println!(
+                debug!(
                     "Directory \"{}\" created",
                     &target_directory.to_str().unwrap()
                 );
             }
             Err(error) => {
-                println!(
-                    "ERROR: Unable to create directory {:?} ({:?}), skipping file...",
-                    &target_directory, error
+                error!(
+                    "Unable to create directory \"{}\" ({}), skipping file...",
+                    &target_directory.display(),
+                    error
                 );
-                println!("SKIP: ");
                 return None;
             }
         };
@@ -231,12 +233,12 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     let mut copy_file = true;
     if copy_target.exists() {
         if should_recopy(&path, &copy_target) {
-            println!(
+            info!(
                 "COPY: {} exists in destination, but fails comparison",
                 filename
             );
         } else {
-            println!(
+            info!(
                 "SKIP: {} exists in destination and passes comparison",
                 filename
             );
@@ -245,27 +247,23 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     } else {
         match find_existing_release(&target_directory, release, rule) {
             Some(ExistingRelease::Superior(path)) => {
-                println!("SUPERIOR RELEASE FOUND: {:?}", path);
+                info!("Superior release found: \"{}\"", path.display());
                 copy_file = false;
             }
             Some(ExistingRelease::Inferior(path)) => {
-                println!("INFERIOR RELEASE FOUND: {:?}", path);
+                info!("Inferior release found: \"{}\"", path.display());
                 remove_file(&config, &path);
             }
-            None => println!("NO OTHER RELEASE"),
+            None => info!("No other release"),
         }
     }
     if copy_file {
         match fs::copy(&path, &copy_target) {
             Ok(_) => {
-                println!(
-                    "SUCCESS: Copied \"{}\" to \"{}\"",
-                    filename,
-                    &copy_target.display()
-                );
+                info!("Copied \"{}\" to \"{}\"", filename, &copy_target.display());
             }
             Err(_) => {
-                println!("FAIL: Failed to copy \"{}\"", filename);
+                error!("Failed to copy \"{}\"", filename);
             }
         };
     }
@@ -273,9 +271,15 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
 }
 
 fn main() {
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .env()
+        .init()
+        .unwrap();
+
     // TODO: Configurable config path.
     let Some(project_directory) = directories::ProjectDirs::from("", "", "yurizaki") else {
-        println!("Could not establish configuration directory.");
+        error!("Could not establish configuration directory.");
         process::exit(1);
     };
     let mut config_path = PathBuf::new();
@@ -287,13 +291,13 @@ fn main() {
         Err(config::Error::Io(error)) => {
             match error.kind() {
                 io::ErrorKind::NotFound => {
-                    println!(
+                    error!(
                         "Could not find the configuration file in \"{}\".",
                         config_path.display()
                     );
                 }
                 _ => {
-                    println!(
+                    error!(
                         "There was a problem with reading the configuration: {}",
                         error
                     );
@@ -302,15 +306,15 @@ fn main() {
             return;
         }
         Err(config::Error::MissingSource) => {
-            println!("Configuration file is missing a source path");
+            error!("Configuration file is missing a source path");
             process::exit(1);
         }
         Err(config::Error::MissingLibrary) => {
-            println!("Configuration file is missing a library path");
+            error!("Configuration file is missing a library path");
             process::exit(1);
         }
         Err(config::Error::YamlError) => {
-            println!("There was a problem with reading the configuration Yaml file");
+            error!("There was a problem with reading the configuration Yaml file");
             process::exit(1);
         }
     };
@@ -328,15 +332,15 @@ fn main() {
     match watcher.watch(&configuration.source, RecursiveMode::NonRecursive) {
         Ok(()) => {}
         Err(notify::Error::PathNotFound) => {
-            println!(
-                "Could not watch source path '{}'. \
+            error!(
+                "Could not watch source path \"{}\". \
                 Please verify that the `source` configuration value is set correctly.",
                 configuration.source.display()
             );
             process::exit(1);
         }
         Err(error) => {
-            println!("Source watch error: {}", error);
+            error!("Source watch error: {}", error);
             process::exit(1);
         }
     };
@@ -350,7 +354,7 @@ fn main() {
         let event = match watch_rx.recv() {
             Ok(event) => event,
             Err(e) => {
-                println!("watch error: {}", e);
+                error!("Watch error: {}", e);
                 continue;
             }
         };
@@ -374,7 +378,7 @@ fn main() {
 
         let send_result = action_tx.send(action);
         if send_result.is_err() {
-            println!("Unable to send action notification for {}", path.display());
+            error!("Unable to send action notification for {}", path.display());
         }
     });
 
@@ -388,7 +392,7 @@ fn main() {
                 let new_configuration = match config::Configuration::new(&config_path) {
                     Ok(config) => config,
                     Err(_) => {
-                        println!("WARNING: Unable to reload configuration. Old configuration will be used instead.");
+                        warn!("Unable to reload configuration. Old configuration will be used instead.");
                         continue;
                     }
                 };
