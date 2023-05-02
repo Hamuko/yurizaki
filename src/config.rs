@@ -106,6 +106,12 @@ impl Configuration {
             None => return Err(Error::MissingLibrary),
         };
 
+        if cfg!(not(feature = "trash")) && trash {
+            println!(
+                "yurizaki was built without trash support; enabling trash does nothing."
+            );
+        }
+
         Ok(Configuration {
             library: library,
             mapping: mapping,

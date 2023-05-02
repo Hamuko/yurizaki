@@ -1,4 +1,6 @@
 extern crate directories;
+
+#[cfg(feature = "trash")]
 extern crate trash;
 
 use std::fs;
@@ -125,9 +127,10 @@ fn should_recopy(from: &PathBuf, to: &PathBuf) -> bool {
     false
 }
 
+#[cfg(feature = "trash")]
 fn remove_file(config: &config::Configuration, path: &PathBuf) {
     if config.trash {
-        match trash::remove(path) {
+        match trash::delete(path) {
             Ok(_) => {
                 println!("Removed file \"{}\"", path.display());
             }
@@ -143,6 +146,18 @@ fn remove_file(config: &config::Configuration, path: &PathBuf) {
             Err(e) => {
                 println!("Unable to delete \"{}\" ({})", path.display(), e);
             }
+        }
+    }
+}
+
+#[cfg(not(feature = "trash"))]
+fn remove_file(_config: &config::Configuration, path: &PathBuf) {
+    match fs::remove_file(path) {
+        Ok(_) => {
+            println!("Removed file \"{}\"", path.display());
+        }
+        Err(e) => {
+            println!("Unable to delete \"{}\" ({})", path.display(), e);
         }
     }
 }

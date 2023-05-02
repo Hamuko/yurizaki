@@ -8,5 +8,8 @@ edition = "2021"
 anitomy = "0.1"
 directories = "5.0"
 notify = "4.0"
-trash = "1.0.0"
+trash = { version = "3.0", optional = true }
 yaml-rust = "0.4"
+
+[features]
+trash = ["dep:trash"]
