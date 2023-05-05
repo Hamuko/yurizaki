@@ -2,6 +2,7 @@ extern crate yaml_rust;
 
 use log::warn;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -125,6 +126,18 @@ impl Configuration {
     }
 }
 
+impl fmt::Display for Configuration {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let rules = self
+            .rules
+            .iter()
+            .map(|rule| format!("- {}", rule))
+            .collect::<Vec<String>>()
+            .join("\n");
+        write!(f, "{}", rules)
+    }
+}
+
 #[derive(Debug)]
 pub struct Rule {
     pub groups: StringVec,
@@ -158,6 +171,13 @@ impl Rule {
 
     pub fn get_priority(&self, group_name: &str) -> Option<usize> {
         self.groups.iter().position(|x| x == group_name)
+    }
+}
+
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let groups = self.groups.join(", ");
+        write!(f, "{} ({})", self.title, groups)
     }
 }
 

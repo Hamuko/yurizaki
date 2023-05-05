@@ -397,7 +397,7 @@ fn main() {
                     }
                 };
                 configuration = new_configuration;
-                dbg!(&configuration);
+                info!("Reloaded configuration:\n{}", configuration);
                 scan_directory(&configuration);
             }
             ActionCategory::Process => {
