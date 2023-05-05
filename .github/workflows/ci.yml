@@ -93,6 +93,8 @@ jobs:
           - TARGET: x86_64-apple-darwin
             OS: macos-latest
           - TARGET: aarch64-apple-darwin
+            TARGET_CXX: zigcxx
+            TARGET_AR: zigar
             OS: macos-latest
           - TARGET: x86_64-pc-windows-msvc
             OS: windows-latest
@@ -101,6 +103,7 @@ jobs:
       NAME: yurizaki
       TARGET: ${{ matrix.TARGET }}
       TARGET_CC: ${{ matrix.TARGET_CC }}
+      TARGET_CXX: ${{ matrix.TARGET_CXX }}
       TARGET_AR: ${{ matrix.TARGET_AR }}
       OS: ${{ matrix.OS }}
     steps:
@@ -119,8 +122,22 @@ jobs:
             sudo apt-get update
             sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
           fi
+          if [[ $TARGET == "aarch64-apple-darwin" ]]; then
+            brew install zig
+            mkdir ~/bin
+            cat >>~/bin/zigcxx <<'  EOF'
+            #!/bin/bash
+            zig c++ -target aarch64-macos $@
+            EOF
+            cat >>~/bin/zigar <<'  EOF'
+            #!/bin/bash
+            zig ar $@
+            EOF
+            chmod +x ~/bin/zigcxx
+            chmod +x ~/bin/zigar
+          fi
           # some additional configuration for cross-compilation on linux
-          cat >>~/.cargo/config <<EOF
+          cat >>~/.cargo/config <<-'EOF'
           [target.aarch64-unknown-linux-gnu]
           linker = "aarch64-linux-gnu-gcc"
           [target.aarch64-unknown-linux-musl]
