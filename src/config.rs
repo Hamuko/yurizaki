@@ -142,13 +142,13 @@ impl fmt::Display for Configuration {
 pub struct Rule {
     pub groups: StringVec,
     pub title: String,
-    pub minimum: Option<i64>,
+    pub minimum: RuleMinimum,
 }
 
 impl Rule {
     fn read(config: &yaml::Hash, title: String) -> Option<Self> {
         let mut groups: StringVec = Vec::new();
-        let mut minimum: Option<i64> = None;
+        let mut minimum= RuleMinimum::default();
         for (key, value) in config {
             match (key.as_str(), value) {
                 (Some("groups"), Yaml::Array(array)) => {
@@ -156,8 +156,8 @@ impl Rule {
                         groups = vec;
                     }
                 }
-                (Some("minimum"), Yaml::Integer(integer)) => {
-                    minimum = Some(*integer);
+                (Some("minimum"), Yaml::Hash(hash)) => {
+                    minimum = RuleMinimum::read(hash);
                 }
                 _ => (),
             }
@@ -178,6 +178,25 @@ impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let groups = self.groups.join(", ");
         write!(f, "{} ({})", self.title, groups)
+    }
+}
+#[derive(Debug, Default)]
+pub struct RuleMinimum {
+    pub episode_number: Option<i64>,
+}
+
+impl RuleMinimum {
+    fn read(hash: &yaml::Hash) -> Self {
+        let mut episode_number: Option<i64> = None;
+        for (key, value) in hash {
+            match (key.as_str(), value) {
+                (Some("episode"), Yaml::Integer(integer)) => {
+                    episode_number = Some(*integer);
+                }
+                _ => (),
+            }
+        }
+        Self { episode_number }
     }
 }
 

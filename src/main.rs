@@ -184,7 +184,7 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     }
 
     // Check minimum episode threshold.
-    match (rule.minimum, release.numerical_episode()) {
+    match (rule.minimum.episode_number, release.numerical_episode()) {
         (Some(minimum), Some(episode_number)) => {
             if minimum > episode_number as i64 {
                 info!(
