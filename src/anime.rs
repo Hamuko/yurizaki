@@ -59,11 +59,11 @@ impl Release {
             .map_or(1, |v| v.parse().unwrap_or(1));
         let episode_type = EpisodeType::from_element(elements.get(ElementCategory::AnimeType));
         Some(Release {
-            title: title,
-            group: group,
-            episode: episode,
-            version: version,
-            episode_type: episode_type,
+            title,
+            group,
+            episode,
+            version,
+            episode_type,
         })
     }
 

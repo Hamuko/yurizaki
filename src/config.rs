@@ -112,12 +112,13 @@ impl Configuration {
             warn!("yurizaki was built without trash support; enabling trash does nothing.");
         }
 
+        let source = PathBuf::from(source_path);
         Ok(Configuration {
-            library: library,
-            mapping: mapping,
-            rules: rules,
-            source: PathBuf::from(source_path),
-            trash: trash,
+            library,
+            mapping,
+            rules,
+            source,
+            trash,
         })
     }
 
@@ -148,7 +149,7 @@ pub struct Rule {
 impl Rule {
     fn read(config: &yaml::Hash, title: String) -> Option<Self> {
         let mut groups: StringVec = Vec::new();
-        let mut minimum= RuleMinimum::default();
+        let mut minimum = RuleMinimum::default();
         for (key, value) in config {
             match (key.as_str(), value) {
                 (Some("groups"), Yaml::Array(array)) => {
@@ -163,9 +164,9 @@ impl Rule {
             }
         }
         Some(Rule {
-            title: title,
-            groups: groups,
-            minimum: minimum,
+            title,
+            groups,
+            minimum,
         })
     }
 
