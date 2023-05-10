@@ -2,6 +2,8 @@
 
 FROM rust:1.69 as build
 
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
+
 RUN USER=root cargo new --bin yurizaki
 
 WORKDIR ./yurizaki
