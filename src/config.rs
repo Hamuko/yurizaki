@@ -1,7 +1,11 @@
 extern crate yaml_rust;
 
+#[cfg(feature = "directories")]
+extern crate directories;
+
 use log::warn;
 use std::collections::HashMap;
+use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io;
@@ -45,6 +49,28 @@ pub struct Configuration {
     pub source: PathBuf,
     pub library: PathBuf,
     pub trash: bool,
+}
+
+fn get_config_from_args() -> Option<PathBuf> {
+    let path = env::args().nth(1)?;
+    Some(PathBuf::from(path))
+}
+
+#[cfg(feature = "directories")]
+pub fn get_path() -> Option<PathBuf> {
+    if let Some(config_path) = get_config_from_args() {
+        return Some(config_path);
+    }
+    let project_directory = directories::ProjectDirs::from("", "", "yurizaki")?;
+    let mut config_path = PathBuf::new();
+    config_path.push(project_directory.config_dir());
+    config_path.push("config.yml");
+    Some(config_path)
+}
+
+#[cfg(not(feature = "directories"))]
+pub fn get_path() -> Option<PathBuf> {
+    return get_config_from_args();
 }
 
 impl Configuration {

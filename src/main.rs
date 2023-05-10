@@ -1,5 +1,3 @@
-extern crate directories;
-
 #[cfg(feature = "trash")]
 extern crate trash;
 
@@ -277,15 +275,11 @@ fn main() {
         .init()
         .unwrap();
 
-    // TODO: Configurable config path.
-    let Some(project_directory) = directories::ProjectDirs::from("", "", "yurizaki") else {
+    let Some(config_path) = config::get_path() else {
         error!("Could not establish configuration directory.");
         process::exit(1);
     };
-    let mut config_path = PathBuf::new();
-    config_path.push(project_directory.config_dir());
-    config_path.push("config.yml");
-
+    debug!("Loading configuration from \"{}\"", config_path.display());
     let mut configuration = match config::Configuration::new(&config_path) {
         Ok(config) => config,
         Err(config::Error::Io(error)) => {

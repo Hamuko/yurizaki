@@ -23,10 +23,7 @@ RUN cargo build --release
 FROM debian:bullseye-slim
 
 RUN groupadd -g 1000 yurizaki && \
-    useradd -g yurizaki yurizaki && \
-    mkdir -p /home/yurizaki/.config/yurizaki && \
-    chown yurizaki:yurizaki /home/yurizaki/.config/yurizaki && \
-    ln -s /config.yml /home/yurizaki/.config/yurizaki/config.yml
+    useradd -g yurizaki yurizaki
 
 WORKDIR /home/yurizaki/bin/
 
@@ -37,4 +34,4 @@ USER yurizaki
 
 ENV RUST_LOG=info
 
-CMD ["./yurizaki"]
+CMD ["./yurizaki", "/config.yml"]
