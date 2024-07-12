@@ -33,8 +33,8 @@ It's also possible to exclude prior episodes from the matching logic by giving a
 ### Example configuration
 
 ```yaml
-source: /home/hamuko/Downloads
-library: /mnt/Media/Anime
+source: /src
+library: /library
 trash: false
 
 # Matching rules:
@@ -72,6 +72,22 @@ docker run \
     -v /path/to/src/directory:/src \
     -v /path/to/library/directory:/library \
     ghcr.io/hamuko/yurizaki:latest
+```
+
+Docker Compose:
+
+```yaml
+version: '3.7'
+services:
+  yurizaki:
+    image: ghcr.io/hamuko/yurizaki:latest
+    container_name: yurizaki
+    user: "<user ID>:<group ID>"
+    volumes:
+      - /path/to/config.yml:/config.yml
+      - /path/to/src/directory:/src
+      - /path/to/library/directory:/library
+    restart: on-failure
 ```
 
 Remember to use the paths used inside the container (`/src` and `/library` in the above example) and not the ones used on the host machine when writing the configuration file.
