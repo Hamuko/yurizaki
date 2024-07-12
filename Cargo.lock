@@ -19,18 +19,18 @@ dependencies = [
 
 [[package]]
 name = "anitomy"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5dbd2cfb14d3a442954182c1e8804a859e65143473ddfc7521e8766a4c44a9d"
+checksum = "ec50f0fc7d234becce1b668dfdba8ca7f5f130b01719b153c8a7fe5457531ba7"
 dependencies = [
  "anitomy-sys",
 ]
 
 [[package]]
 name = "anitomy-sys"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1ade7dff1b0d6e91f90986f26538baa14f8143d9c5d79cae3f914070a2e30ea"
+checksum = "32aae13d06f5e92fcd031f4ef9f4fd05c9763b612f406bb71b63b84a423917db"
 dependencies = [
  "cc",
 ]
