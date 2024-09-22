@@ -1,12 +1,12 @@
 # BUILD CONTAINER
 
-FROM rust:1.73 as build
+FROM rust:1.73 AS build
 
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
 RUN USER=root cargo new --bin yurizaki
 
-WORKDIR ./yurizaki
+WORKDIR /yurizaki
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 

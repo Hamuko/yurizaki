@@ -59,10 +59,18 @@ fn find_existing_release(
     let episode_number = release.numerical_episode();
 
     for entry in fs::read_dir(path).unwrap() {
-        let Some(path) = entry_to_file_path(entry) else { continue };
-        let Some(filename) = path.file_name() else { continue };
-        let Some(filename) = filename.to_str() else { continue };
-        let Some(entry_release) = anime::Release::from(filename) else { continue };
+        let Some(path) = entry_to_file_path(entry) else {
+            continue;
+        };
+        let Some(filename) = path.file_name() else {
+            continue;
+        };
+        let Some(filename) = filename.to_str() else {
+            continue;
+        };
+        let Some(entry_release) = anime::Release::from(filename) else {
+            continue;
+        };
 
         // Check that the entry is of the same type as the given release, since we
         // wouldn't want to match "Anime - OVA1" to "Anime - 01".

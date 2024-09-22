@@ -48,6 +48,8 @@ pub struct Configuration {
     mapping: RuleMapping,
     pub source: PathBuf,
     pub library: PathBuf,
+
+    #[cfg(feature = "trash")]
     pub trash: bool,
 }
 
@@ -109,14 +111,18 @@ impl Configuration {
                     }
                     (Some(title), Yaml::Hash(hash)) => {
                         let title = title.to_string();
-                        let Some(rule) = Rule::read(hash, title.clone()) else { continue };
+                        let Some(rule) = Rule::read(hash, title.clone()) else {
+                            continue;
+                        };
                         rules.push(rule);
                         let rule_index = rules.len() - 1;
                         mapping.insert(title, rule_index);
 
                         let blank_vec = Vec::new();
                         for alias in value["aliases"].as_vec().unwrap_or(&blank_vec) {
-                            let Some(alias) = alias.as_str() else { continue };
+                            let Some(alias) = alias.as_str() else {
+                                continue;
+                            };
                             mapping.insert(alias.to_string(), rule_index);
                         }
                     }
@@ -139,13 +145,25 @@ impl Configuration {
         }
 
         let source = PathBuf::from(source_path);
-        Ok(Configuration {
-            library,
-            mapping,
-            rules,
-            source,
-            trash,
-        })
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "trash")] {
+                Ok(Configuration {
+                library,
+                mapping,
+                rules,
+                source,
+                trash,
+            })
+            } else {
+                Ok(Configuration {
+                library,
+                mapping,
+                rules,
+                source,
+            })
+            }
+        }
     }
 
     pub fn get_rule(&self, name: &str) -> Option<&Rule> {
