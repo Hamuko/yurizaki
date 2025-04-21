@@ -2,6 +2,9 @@ extern crate anitomy;
 
 use anitomy::{Anitomy, ElementCategory};
 
+#[cfg(feature = "regex")]
+use regex::Captures;
+
 #[derive(Debug, PartialEq)]
 pub enum EpisodeType {
     Ending,
@@ -64,6 +67,23 @@ impl Release {
             episode,
             version,
             episode_type,
+        })
+    }
+
+    #[cfg(feature = "regex")]
+    pub fn from_captures(title: &str, captures: Captures) -> Option<Release> {
+        let group = captures.name("group")?.as_str();
+        let episode = captures.name("episode")?.as_str();
+        let version: i32 = match captures.name("version") {
+            Some(version) => version.as_str().parse().unwrap_or(1),
+            None => 1,
+        };
+        Some(Release {
+            title: title.to_string(),
+            group: group.to_string(),
+            episode: episode.to_string(),
+            version,
+            episode_type: EpisodeType::Episode,
         })
     }
 

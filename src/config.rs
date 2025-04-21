@@ -3,7 +3,6 @@ extern crate yaml_rust;
 #[cfg(feature = "directories")]
 extern crate directories;
 
-use log::warn;
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
@@ -13,6 +12,9 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use yaml_rust::{yaml, Yaml, YamlLoader};
+
+#[cfg(feature = "regex")]
+use regex::Regex;
 
 type StringVec = Vec<String>;
 
@@ -34,6 +36,9 @@ impl StringVecMethods for StringVec {
 type RuleList = Vec<Rule>;
 type RuleMapping = HashMap<String, usize>;
 
+#[cfg(feature = "regex")]
+type RuleRegexes = Vec<(Regex, usize)>;
+
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
@@ -44,13 +49,16 @@ pub enum Error {
 
 #[derive(Debug)]
 pub struct Configuration {
-    rules: RuleList,
+    pub rules: RuleList,
     mapping: RuleMapping,
     pub source: PathBuf,
     pub library: PathBuf,
 
     #[cfg(feature = "trash")]
     pub trash: bool,
+
+    #[cfg(feature = "regex")]
+    pub regexes: RuleRegexes,
 }
 
 fn get_config_from_args() -> Option<PathBuf> {
@@ -97,6 +105,9 @@ impl Configuration {
         let mut source_path: Option<String> = None;
         let mut trash: bool = false;
 
+        #[cfg(feature = "regex")]
+        let mut regexes = RuleRegexes::new();
+
         if let Some(configuration_yaml) = configuration_yaml.as_hash() {
             for (key, value) in configuration_yaml {
                 match (key.as_str(), value) {
@@ -125,6 +136,15 @@ impl Configuration {
                             };
                             mapping.insert(alias.to_string(), rule_index);
                         }
+
+                        #[cfg(feature = "regex")]
+                        if let Some(regex_strings) = value["regex"].as_vec() {
+                            for regex_string in regex_strings {
+                                if let Some(regex) = Self::parse_regex(regex_string) {
+                                    regexes.push((regex, rule_index));
+                                }
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -141,33 +161,57 @@ impl Configuration {
         };
 
         if cfg!(not(feature = "trash")) && trash {
-            warn!("yurizaki was built without trash support; enabling trash does nothing.");
+            log::warn!("yurizaki was built without trash support; enabling trash does nothing.");
         }
 
         let source = PathBuf::from(source_path);
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "trash")] {
-                Ok(Configuration {
-                library,
-                mapping,
-                rules,
-                source,
-                trash,
-            })
-            } else {
-                Ok(Configuration {
-                library,
-                mapping,
-                rules,
-                source,
-            })
-            }
-        }
+        Ok(Configuration {
+            library,
+            mapping,
+            rules,
+            source,
+            #[cfg(feature = "trash")]
+            trash,
+            #[cfg(feature = "regex")]
+            regexes,
+        })
     }
 
     pub fn get_rule(&self, name: &str) -> Option<&Rule> {
         Some(&self.rules[*self.mapping.get(name)?])
+    }
+
+    #[cfg(feature = "regex")]
+    fn parse_regex(string: &Yaml) -> Option<Regex> {
+        let Some(regex_string) = string.as_str() else {
+            log::warn!("Regex value '{:?}' could not be parsed as string", string);
+            return None;
+        };
+        let Ok(regex) = Regex::new(regex_string) else {
+            log::warn!("String '{}' could not be parsed as regex", regex_string);
+            return None;
+        };
+        let captures = regex.capture_names().flatten().collect::<Vec<&str>>();
+        let has_episode = captures.iter().any(|e| e == &"episode");
+        let has_group = captures.iter().any(|e| e == &"group");
+        if has_episode && has_group {
+            Some(regex)
+        } else {
+            if !has_episode {
+                log::warn!(
+                    "Could not use regex '{}': no capture group for 'episode'",
+                    regex,
+                );
+            }
+            if !has_group {
+                log::warn!(
+                    "Could not use regex '{}': no capture group for 'group'",
+                    regex,
+                );
+            }
+            None
+        }
     }
 }
 

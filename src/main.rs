@@ -54,6 +54,7 @@ fn find_existing_release(
     path: &PathBuf,
     release: anime::Release,
     rule: &config::Rule,
+    config: &config::Configuration,
 ) -> Option<ExistingRelease> {
     let group_priority = rule.get_priority(&release.group).unwrap();
     let episode_number = release.numerical_episode();
@@ -68,7 +69,7 @@ fn find_existing_release(
         let Some(filename) = filename.to_str() else {
             continue;
         };
-        let Some(entry_release) = anime::Release::from(filename) else {
+        let Some(entry_release) = make_release(config, filename) else {
             continue;
         };
 
@@ -170,6 +171,21 @@ fn remove_file(_config: &config::Configuration, path: &PathBuf) {
     }
 }
 
+fn make_release(config: &config::Configuration, filename: &str) -> Option<anime::Release> {
+    #[cfg(feature = "regex")]
+    for (regex, index) in &config.regexes {
+        if let Some(captures) = regex.captures(filename) {
+            debug!("Matched {} to regex {}", filename, regex);
+            let rule = &config.rules[*index];
+            if let Some(release) = anime::Release::from_captures(&rule.title, captures) {
+                return Some(release);
+            }
+        }
+    }
+
+    anime::Release::from(filename)
+}
+
 fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     if !path.exists() {
         // File doesn't actually exist, so let's bail out.
@@ -177,7 +193,7 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     }
 
     let filename = &path.file_name()?.to_str()?;
-    let release = anime::Release::from(filename)?;
+    let release = make_release(config, filename)?;
     let rule = config.get_rule(&release.title)?;
     info!("MATCH: \"{}\" => {}", &filename, rule.title);
 
@@ -251,7 +267,7 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
             copy_file = false;
         }
     } else {
-        match find_existing_release(&target_directory, release, rule) {
+        match find_existing_release(&target_directory, release, rule, config) {
             Some(ExistingRelease::Superior(path)) => {
                 info!("Superior release found: \"{}\"", path.display());
                 copy_file = false;
