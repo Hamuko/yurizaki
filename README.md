@@ -28,6 +28,8 @@ Names of the release groups should be listed under the `groups` key for every ru
 
 Other possible anime titles to match against can be listed under the optional `aliases` key. If different release groups use different titles in their filenames, aliases will be used to supplement the matching logic.
 
+For really tricky cases where anitomy parsing fails, you can compile a list of regular expressions under the `regex` key in each rule. The regular expressions must contain capture groups for `episode` and `group` in order to match episode numbers and release groups. They may also optionally include a capture group `version`. Regular parsing will still be used as a fallback, so you can have automatic parsing and regex parsing for different groups in a single rule.
+
 It's also possible to exclude prior episodes from the matching logic by giving an episode number for the `episode` key under the `minimum` key. All episodes must have an episode number equal or greater than this value to be copied. This is useful for separating split cours.
 
 ### Example configuration
@@ -38,6 +40,13 @@ library: /library
 trash: false
 
 # Matching rules:
+
+Hot Pockets:
+  groups:
+    - Redundant-subs
+    - BadSubtitles
+  regex:
+    - ^\[(?<group>Redundant-subs)\] Hot Pockets - (?<episode>\d+) \(S01E\d+\)
 
 Mev-Dev Different:
   groups:
@@ -51,6 +60,12 @@ To Aru Himitsu no Bangumi Y:
     - BWN
     - Edited-BadSubtitles
     - BadSubtitles
+
+UMA Girls - Cinderella Dust:
+  groups:
+    - ToolSub
+  regex:
+    - ^UMAgirls\.Cinderella\.Dust\.S01E(?<episode>\d+)\..*-(?<group>ToolSub).mkv$
 
 Wizard from Neptune Part 2:
   groups:
