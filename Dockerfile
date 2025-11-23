@@ -1,6 +1,6 @@
 # BUILD CONTAINER
 
-FROM rust:1.86 AS build
+FROM rust:1.91 AS build
 
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
@@ -22,7 +22,7 @@ RUN cargo build --release
 
 # RUNTIME CONTAINER
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN groupadd -g 1000 yurizaki && \
     useradd -g yurizaki yurizaki
