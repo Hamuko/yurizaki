@@ -11,38 +11,42 @@ env:
 
 jobs:
   test:
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Cargo cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ./target
-        key: build-cargo-registry-{{ runner.os }}
-    - name: Run tests
-      run: cargo test --all-features --verbose
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Cargo cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          key: build-cargo-registry-x86_64-unknown-linux-gnu
+      - name: Run tests
+        run: cargo test --all-features --verbose
 
   docker:
+    name: Build Docker image
     needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Log in to the Container registry
+      - name: Log in to the container registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Docker meta
+      - name: Set up Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -64,6 +68,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build:
+    name: Build binary - ${{ matrix.LABEL }}
     needs: test
     strategy:
       fail-fast: false
@@ -71,18 +76,27 @@ jobs:
         include:
           - TARGET: x86_64-unknown-linux-gnu
             OS: ubuntu-latest
+            LABEL: Linux (x86-64)
           - TARGET: aarch64-unknown-linux-gnu
             OS: ubuntu-latest
+            LABEL: Linux (ARM64)
           - TARGET: arm-unknown-linux-gnueabihf
             OS: ubuntu-latest
+            LABEL: Linux (Armv6)
           - TARGET: x86_64-apple-darwin
             OS: macos-latest
+            LABEL: macOS (x86-64)
           - TARGET: aarch64-apple-darwin
             TARGET_CXX: zigcxx
             TARGET_AR: zigar
             OS: macos-latest
+            LABEL: macOS (ARM64)
           - TARGET: x86_64-pc-windows-msvc
             OS: windows-latest
+            LABEL: Windows (x86-64)
+          - TARGET: aarch64-pc-windows-msvc
+            OS: windows-latest
+            LABEL: Windows (ARM64)
     runs-on: ${{ matrix.OS }}
     env:
       NAME: yurizaki
@@ -92,14 +106,15 @@ jobs:
       TARGET_AR: ${{ matrix.TARGET_AR }}
       OS: ${{ matrix.OS }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
       - name: Cargo cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ./target
-          key: build-cargo-registry-${{matrix.TARGET}}
+          key: build-cargo-registry-${{ matrix.TARGET }}
       - name: Install and configure dependencies
         shell: bash
         run: |
@@ -132,7 +147,7 @@ jobs:
           [target.arm-unknown-linux-musleabihf]
           linker = "arm-linux-gnueabihf-gcc"
           EOF
-      - name: Install rust target
+      - name: Install Rust target
         shell: bash
         run: rustup target add $TARGET
       - name: Run build
@@ -153,19 +168,20 @@ jobs:
           mv ./target/$TARGET/release/$EXEC ./$EXEC
           tar -czf ./artifacts/$NAME-$TARGET-${GITHUB_REF_NAME//\//-}.tar.gz $EXEC
       - name: Archive artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: build-artifact-${{ matrix.TARGET }}
           path: |
             ./artifacts
 
   deploy:
+    name: Attach downloads to release
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: ./artifacts
           pattern: build-artifact-*
