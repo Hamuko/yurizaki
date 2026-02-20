@@ -1,6 +1,6 @@
 # BUILD CONTAINER
 
-FROM rust:1.91 AS build
+FROM rust:1.93 AS build
 
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
@@ -22,18 +22,10 @@ RUN cargo build --release
 
 # RUNTIME CONTAINER
 
-FROM debian:trixie-slim
+FROM gcr.io/distroless/cc-debian13
 
-RUN groupadd -g 1000 yurizaki && \
-    useradd -g yurizaki yurizaki
-
-WORKDIR /home/yurizaki/bin/
-
-COPY --from=build /yurizaki/target/release/yurizaki .
-RUN chown yurizaki:yurizaki yurizaki
-
-USER yurizaki
+COPY --from=build /yurizaki/target/release/yurizaki /
 
 ENV RUST_LOG=info
 
-CMD ["./yurizaki", "/config.yml"]
+CMD ["/yurizaki", "/config.yml"]
