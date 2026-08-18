@@ -2,16 +2,16 @@
 extern crate trash;
 
 use log::{debug, error, info, warn, LevelFilter};
+use notify_debouncer_mini::{
+    new_debouncer, notify::*, DebounceEventHandler, DebounceEventResult, DebouncedEventKind,
+};
+use simple_logger::SimpleLogger;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process;
-use std::sync::mpsc::channel;
-use std::thread;
+use std::sync::mpsc::{channel, Sender};
 use std::time::Duration;
-
-use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-use simple_logger::SimpleLogger;
 
 mod anime;
 mod config;
@@ -31,6 +31,45 @@ struct Action {
 enum ExistingRelease {
     Inferior(PathBuf),
     Superior(PathBuf),
+}
+
+struct FileEventHandler {
+    config_path: PathBuf,
+    tx: Sender<Action>,
+}
+
+impl DebounceEventHandler for FileEventHandler {
+    fn handle_event(&mut self, result: DebounceEventResult) {
+        match result {
+            Ok(debounced_events) => {
+                for debounced_event in debounced_events {
+                    println!("{:?}", debounced_event);
+                    if debounced_event.kind == DebouncedEventKind::AnyContinuous {
+                        continue; // Skip continuous events in case the download/transfer is still happening.
+                    }
+                    let action = if debounced_event.path == self.config_path {
+                        Action {
+                            category: ActionCategory::ReloadConfig,
+                            path: self.config_path.clone(),
+                        }
+                    } else {
+                        Action {
+                            category: ActionCategory::Process,
+                            path: debounced_event.path.clone(),
+                        }
+                    };
+                    let send_result = self.tx.send(action);
+                    if send_result.is_err() {
+                        error!(
+                            "Unable to send action notification for {}",
+                            debounced_event.path.display()
+                        );
+                    }
+                }
+            }
+            Err(e) => println!("Error {:?}", e),
+        }
+    }
 }
 
 fn entry_to_file_path(entry: io::Result<fs::DirEntry>) -> Option<PathBuf> {
@@ -337,68 +376,26 @@ fn main() {
         }
     };
 
-    let (watch_tx, watch_rx) = channel();
-    let mut config_watcher: RecommendedWatcher =
-        watcher(watch_tx.clone(), Duration::from_secs(5)).unwrap();
-    config_watcher
-        .watch(&config_path, RecursiveMode::NonRecursive)
-        .unwrap();
+    let (action_tx, action_rx) = channel::<Action>();
 
     // TODO: Configurable debounce time (if it's even needed).
     let debounce_duration = Duration::from_secs(60);
-    let mut watcher: RecommendedWatcher = watcher(watch_tx, debounce_duration).unwrap();
-    match watcher.watch(&configuration.source, RecursiveMode::NonRecursive) {
-        Ok(()) => {}
-        Err(notify::Error::PathNotFound) => {
-            error!(
-                "Could not watch source path \"{}\". \
-                Please verify that the `source` configuration value is set correctly.",
-                configuration.source.display()
-            );
-            process::exit(1);
-        }
-        Err(error) => {
-            error!("Source watch error: {}", error);
-            process::exit(1);
-        }
+    let file_event_handler = FileEventHandler {
+        config_path: config_path.clone(),
+        tx: action_tx,
     };
+    let mut debouncer = new_debouncer(debounce_duration, file_event_handler).unwrap();
+    debouncer
+        .watcher()
+        .watch(&config_path, RecursiveMode::NonRecursive)
+        .unwrap();
+    debouncer
+        .watcher()
+        .watch(&configuration.source, RecursiveMode::NonRecursive)
+        .unwrap();
 
     // Perform initial scan after.
     scan_directory(&configuration);
-
-    let (action_tx, action_rx) = channel();
-    let cloned_config_path = config_path.clone();
-    thread::spawn(move || loop {
-        let event = match watch_rx.recv() {
-            Ok(event) => event,
-            Err(e) => {
-                error!("Watch error: {}", e);
-                continue;
-            }
-        };
-        let path = match event {
-            DebouncedEvent::Create(path) => path,
-            DebouncedEvent::Write(path) => path,
-            _ => continue,
-        };
-
-        let action = if path == cloned_config_path {
-            Action {
-                category: ActionCategory::ReloadConfig,
-                path: path.clone(),
-            }
-        } else {
-            Action {
-                category: ActionCategory::Process,
-                path: path.clone(),
-            }
-        };
-
-        let send_result = action_tx.send(action);
-        if send_result.is_err() {
-            error!("Unable to send action notification for {}", path.display());
-        }
-    });
 
     loop {
         let action = match action_rx.recv() {
