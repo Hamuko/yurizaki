@@ -43,7 +43,6 @@ impl DebounceEventHandler for FileEventHandler {
         match result {
             Ok(debounced_events) => {
                 for debounced_event in debounced_events {
-                    println!("{:?}", debounced_event);
                     if debounced_event.kind == DebouncedEventKind::AnyContinuous {
                         continue; // Skip continuous events in case the download/transfer is still happening.
                     }
@@ -245,7 +244,7 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
     }
 
     // Check minimum episode threshold.
-    match (rule.minimum.episode_number, release.numerical_episode()) {
+    match (rule.minimum_episode, release.numerical_episode()) {
         (Some(minimum), Some(episode_number)) => {
             if minimum > episode_number as i64 {
                 info!(
@@ -370,16 +369,18 @@ fn main() {
             error!("Configuration file is missing a library path");
             process::exit(1);
         }
-        Err(config::Error::YamlError) => {
-            error!("There was a problem with reading the configuration Yaml file");
+        Err(config::Error::Yaml(error)) => {
+            error!(
+                "There was a problem with reading the configuration Yaml file: {}",
+                error
+            );
             process::exit(1);
         }
     };
 
     let (action_tx, action_rx) = channel::<Action>();
 
-    // TODO: Configurable debounce time (if it's even needed).
-    let debounce_duration = Duration::from_secs(60);
+    let debounce_duration = Duration::from_secs(configuration.debounce);
     let file_event_handler = FileEventHandler {
         config_path: config_path.clone(),
         tx: action_tx,
