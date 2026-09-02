@@ -11,7 +11,7 @@ use std::io;
 use std::path::PathBuf;
 use std::process;
 use std::sync::mpsc::{channel, Sender};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 mod anime;
 mod config;
@@ -36,6 +36,23 @@ enum ExistingRelease {
 struct FileEventHandler {
     config_path: PathBuf,
     tx: Sender<Action>,
+    debounce: Duration,
+}
+
+fn get_file_modified_duration(path: &PathBuf) -> Result<Duration> {
+    let metadata = fs::metadata(path)?;
+    let modified = metadata.modified()?;
+    let now = SystemTime::now();
+    let duration = match now.duration_since(modified) {
+        Ok(duration) => duration,
+        Err(error) => {
+            warn!("Could not calculate modified time: {}", error);
+            return Err(Error::generic(
+                "Unexpected duration calculation error. Maybe your computer is fucked?",
+            ));
+        }
+    };
+    Ok(duration)
 }
 
 impl DebounceEventHandler for FileEventHandler {
@@ -46,6 +63,31 @@ impl DebounceEventHandler for FileEventHandler {
                     if debounced_event.kind == DebouncedEventKind::AnyContinuous {
                         continue; // Skip continuous events in case the download/transfer is still happening.
                     }
+                    if debounced_event.path.try_exists().is_ok_and(|x| !x) {
+                        debug!(
+                            "Skipping {}: file does not exist",
+                            debounced_event.path.display()
+                        );
+                        continue;
+                    }
+                    match get_file_modified_duration(&debounced_event.path) {
+                        Ok(modified_since) => {
+                            if modified_since > self.debounce {
+                                debug!(
+                                    "Skipping {}: modified too long ago",
+                                    debounced_event.path.display()
+                                );
+                                continue;
+                            }
+                        }
+                        Err(error) => {
+                            warn!(
+                                "Could not get modified time for {}: {}",
+                                debounced_event.path.display(),
+                                error
+                            );
+                        }
+                    };
                     let action = if debounced_event.path == self.config_path {
                         Action {
                             category: ActionCategory::ReloadConfig,
@@ -384,6 +426,7 @@ fn main() {
     let file_event_handler = FileEventHandler {
         config_path: config_path.clone(),
         tx: action_tx,
+        debounce: debounce_duration * 2,
     };
     let mut debouncer = new_debouncer(debounce_duration, file_event_handler).unwrap();
     debouncer
