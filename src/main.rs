@@ -2,115 +2,22 @@
 extern crate trash;
 
 use log::{debug, error, info, warn, LevelFilter};
-use notify_debouncer_mini::{
-    new_debouncer, notify::*, DebounceEventHandler, DebounceEventResult, DebouncedEventKind,
-};
+use notify_debouncer_mini::{new_debouncer, notify::*};
 use simple_logger::SimpleLogger;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process;
-use std::sync::mpsc::{channel, Sender};
-use std::time::{Duration, SystemTime};
+use std::sync::mpsc::channel;
+use std::time::Duration;
 
 mod anime;
 mod config;
-
-#[derive(Debug)]
-enum ActionCategory {
-    ReloadConfig,
-    Process,
-}
-
-#[derive(Debug)]
-struct Action {
-    category: ActionCategory,
-    path: PathBuf,
-}
+mod file;
 
 enum ExistingRelease {
     Inferior(PathBuf),
     Superior(PathBuf),
-}
-
-struct FileEventHandler {
-    config_path: PathBuf,
-    tx: Sender<Action>,
-    debounce: Duration,
-}
-
-fn get_file_modified_duration(path: &PathBuf) -> Result<Duration> {
-    let metadata = fs::metadata(path)?;
-    let modified = metadata.modified()?;
-    let now = SystemTime::now();
-    let duration = match now.duration_since(modified) {
-        Ok(duration) => duration,
-        Err(error) => {
-            warn!("Could not calculate modified time: {}", error);
-            return Err(Error::generic(
-                "Unexpected duration calculation error. Maybe your computer is fucked?",
-            ));
-        }
-    };
-    Ok(duration)
-}
-
-impl DebounceEventHandler for FileEventHandler {
-    fn handle_event(&mut self, result: DebounceEventResult) {
-        match result {
-            Ok(debounced_events) => {
-                for debounced_event in debounced_events {
-                    if debounced_event.kind == DebouncedEventKind::AnyContinuous {
-                        continue; // Skip continuous events in case the download/transfer is still happening.
-                    }
-                    if debounced_event.path.try_exists().is_ok_and(|x| !x) {
-                        debug!(
-                            "Skipping {}: file does not exist",
-                            debounced_event.path.display()
-                        );
-                        continue;
-                    }
-                    match get_file_modified_duration(&debounced_event.path) {
-                        Ok(modified_since) => {
-                            if modified_since > self.debounce {
-                                debug!(
-                                    "Skipping {}: modified too long ago",
-                                    debounced_event.path.display()
-                                );
-                                continue;
-                            }
-                        }
-                        Err(error) => {
-                            warn!(
-                                "Could not get modified time for {}: {}",
-                                debounced_event.path.display(),
-                                error
-                            );
-                        }
-                    };
-                    let action = if debounced_event.path == self.config_path {
-                        Action {
-                            category: ActionCategory::ReloadConfig,
-                            path: self.config_path.clone(),
-                        }
-                    } else {
-                        Action {
-                            category: ActionCategory::Process,
-                            path: debounced_event.path.clone(),
-                        }
-                    };
-                    let send_result = self.tx.send(action);
-                    if send_result.is_err() {
-                        error!(
-                            "Unable to send action notification for {}",
-                            debounced_event.path.display()
-                        );
-                    }
-                }
-            }
-            Err(e) => println!("Error {:?}", e),
-        }
-    }
 }
 
 fn entry_to_file_path(entry: io::Result<fs::DirEntry>) -> Option<PathBuf> {
@@ -199,17 +106,12 @@ fn find_existing_release(
     None
 }
 
-fn get_filesize(path: &PathBuf) -> Option<i64> {
-    let metadata = fs::metadata(path).ok()?;
-    Some(metadata.len() as i64)
-}
-
 fn should_recopy(from: &PathBuf, to: &PathBuf) -> bool {
-    let Some(to_filesize) = get_filesize(to) else {
+    let Some(to_filesize) = file::get_filesize(to) else {
         // Failed to get filesize of destination file, so recopying just in case.
         return true;
     };
-    let from_filesize = get_filesize(from);
+    let from_filesize = file::get_filesize(from);
     if from_filesize != Some(to_filesize) {
         return true;
     }
@@ -299,7 +201,7 @@ fn handle_file(config: &config::Configuration, path: PathBuf) -> Option<()> {
         _ => {}
     }
 
-    if get_filesize(&path) == Some(0) {
+    if file::get_filesize(&path) == Some(0) {
         // Avoid working on zero-length files (if a file was
         // for example pre-allocated before writing).
         return None;
@@ -420,10 +322,10 @@ fn main() {
         }
     };
 
-    let (action_tx, action_rx) = channel::<Action>();
+    let (action_tx, action_rx) = channel::<file::Action>();
 
     let debounce_duration = Duration::from_secs(configuration.debounce);
-    let file_event_handler = FileEventHandler {
+    let file_event_handler = file::EventHandler {
         config_path: config_path.clone(),
         tx: action_tx,
         debounce: debounce_duration * 2,
@@ -447,7 +349,7 @@ fn main() {
             Err(_) => continue,
         };
         match action.category {
-            ActionCategory::ReloadConfig => {
+            file::ActionCategory::ReloadConfig => {
                 let new_configuration = match config::Configuration::new(&config_path) {
                     Ok(config) => config,
                     Err(_) => {
@@ -459,7 +361,7 @@ fn main() {
                 info!("Reloaded configuration:\n{}", configuration);
                 scan_directory(&configuration);
             }
-            ActionCategory::Process => {
+            file::ActionCategory::Process => {
                 handle_file(&configuration, action.path);
             }
         }
