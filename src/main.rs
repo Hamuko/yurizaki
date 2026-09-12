@@ -313,6 +313,10 @@ fn main() {
             error!("Configuration file is missing a library path");
             process::exit(1);
         }
+        Err(config::Error::NonexistentPath(path)) => {
+            error!("Path {} does not exist", path.display());
+            process::exit(1);
+        }
         Err(config::Error::Yaml(error)) => {
             error!(
                 "There was a problem with reading the configuration Yaml file: {}",
@@ -352,8 +356,11 @@ fn main() {
             file::ActionCategory::ReloadConfig => {
                 let new_configuration = match config::Configuration::new(&config_path) {
                     Ok(config) => config,
-                    Err(_) => {
-                        warn!("Unable to reload configuration. Old configuration will be used instead.");
+                    Err(error) => {
+                        warn!(
+                            "Unable to reload configuration ({:?}). Old configuration will be used instead.",
+                            error
+                        );
                         continue;
                     }
                 };

@@ -24,6 +24,7 @@ pub enum Error {
     Io(io::Error),
     MissingLibrary,
     MissingSource,
+    NonexistentPath(PathBuf),
     Yaml(serde_yaml::Error),
 }
 
@@ -40,6 +41,21 @@ pub struct Configuration {
 
     #[cfg(feature = "regex")]
     pub regexes: RuleRegexes,
+}
+
+fn check_path_exists(path: &PathBuf) -> Result<(), Error> {
+    match path.try_exists() {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(Error::NonexistentPath(path.clone())),
+        Err(error) => {
+            log::warn!(
+                "Could not determine if {} exists: {}",
+                path.display(),
+                error
+            );
+            Err(Error::NonexistentPath(path.clone()))
+        }
+    }
 }
 
 fn get_config_from_args() -> Option<PathBuf> {
@@ -80,6 +96,7 @@ impl Configuration {
         let debounce = parsed.debounce.unwrap_or(60);
 
         let library = PathBuf::from(library);
+        check_path_exists(&library)?;
         let mut mapping: RuleMapping = RuleMapping::new();
         let mut rules = RuleList::new();
 
@@ -114,6 +131,7 @@ impl Configuration {
         }
 
         let source = PathBuf::from(source);
+        check_path_exists(&source)?;
 
         Ok(Configuration {
             debounce,
