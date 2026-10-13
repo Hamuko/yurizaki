@@ -1,6 +1,4 @@
-extern crate anitomy;
-
-use anitomy::{Anitomy, ElementCategory};
+use anitomy_ng::Element;
 
 #[cfg(feature = "regex")]
 use regex::Captures;
@@ -46,24 +44,29 @@ pub struct Release {
 
 impl Release {
     pub fn from(filename: &str) -> Option<Release> {
-        let mut anitomy = Anitomy::new();
-        let elements = match anitomy.parse(filename) {
-            Ok(elements) => elements,
-            Err(elements) => elements,
-        };
+        let elements = anitomy_ng::parse(filename, anitomy_ng::Options::default());
+        let mut episode: Option<String> = None;
+        let mut group: Option<String> = None;
+        let mut title: Option<String> = None;
+        let mut episode_type: Option<String> = None;
+        let mut version: Option<String> = None;
+        for element in elements {
+            match element.kind {
+                anitomy_ng::ElementKind::Episode => episode = Some(element.value),
+                anitomy_ng::ElementKind::Title => title = Some(element.value),
+                anitomy_ng::ElementKind::ReleaseGroup => group = Some(element.value),
+                anitomy_ng::ElementKind::ReleaseVersion => version = Some(element.value),
+                anitomy_ng::ElementKind::Type => episode_type = Some(element.value),
+                _ => (),
+            }
+        }
 
-        let title = elements.get(ElementCategory::AnimeTitle)?.to_string();
-        let group = elements.get(ElementCategory::ReleaseGroup)?.to_string();
-        let episode = elements
-            .get(ElementCategory::EpisodeNumber)
-            .map_or_else(|| "-1".to_string(), |v| v.to_string());
-        let version: i32 = elements
-            .get(ElementCategory::ReleaseVersion)
-            .map_or(1, |v| v.parse().unwrap_or(1));
-        let episode_type = EpisodeType::from_element(elements.get(ElementCategory::AnimeType));
+        let episode = episode.map_or_else(|| "-1".to_string(), |v| v.to_string());
+        let version = version.map_or(1, |v| v.parse().unwrap_or(1));
+        let episode_type = EpisodeType::from_element(episode_type.as_deref());
         Some(Release {
-            title,
-            group,
+            title: title?,
+            group: group?,
             episode,
             version,
             episode_type,

@@ -21,21 +21,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "anitomy"
-version = "0.2.0"
+name = "anitomy-ng"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec50f0fc7d234becce1b668dfdba8ca7f5f130b01719b153c8a7fe5457531ba7"
+checksum = "55bc3830b578d5d8c5c119b101f0b6a19210c0904e8a5bb936aad495b0f953e9"
 dependencies = [
- "anitomy-sys",
-]
-
-[[package]]
-name = "anitomy-sys"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32aae13d06f5e92fcd031f4ef9f4fd05c9763b612f406bb71b63b84a423917db"
-dependencies = [
- "cc",
+ "regex",
 ]
 
 [[package]]
@@ -1097,7 +1088,7 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
 name = "yurizaki"
 version = "1.2.0"
 dependencies = [
- "anitomy",
+ "anitomy-ng",
  "cfg-if",
  "directories",
  "indexmap",
